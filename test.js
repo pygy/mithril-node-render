@@ -77,4 +77,159 @@ o('components', function () {
   })))).equals('<div><span>huhu</span></div>')
 })
 
+o('`this` in component', function () {
+  var oninit = o.spy()
+  var myComponent = {
+    oninit: function (vnode) {
+      oninit()
+      o(this).equals(vnode.state)('vnode.state should be the context in `oninit`')
+      o(this.foo).equals(undefined)('this.foo should be undefined initially')
+      this.foo = 5
+      o(vnode.state.bar).equals(4)('component properties should be copied to the state')
+    },
+    view: function (vnode) {
+      o(this).equals(vnode.state)('vnode.state should be the context in the view')
+      return m('div', 'hello')
+    },
+    onremove: function (vnode) {
+      o(this).equals(vnode.state)('vnode.state should be the context in `onremove`')
+    },
+    bar: 4
+  }
+
+  o(render([m(myComponent), m(myComponent)])).equals('<div>hello</div><div>hello</div>')
+
+  o(oninit.callCount).equals(2)('the component should have been initialized twice')
+})
+
+o('lifecycle hooks as attributes on elements', function () {
+  var initialized, removed
+  render(m('p',{
+    oninit: function (vnode) {
+      initialized = true
+      o(this).equals(vnode.state)('vnode.state should be the context in `oninit`')
+    },
+    onremove: function (vnode) {
+      removed = true
+      o(this).equals(vnode.state)('vnode.state should be the context in `onremove`')
+    }
+  }))
+  o(initialized).equals(true)('attr.oninit should run')
+  o(removed).equals(true)('attr.onremove should run')
+})
+
+o('lifecycle hooks as attributes on components', function () {
+  var attr_initialized, attr_removed, tag_initialized, tag_removed
+  var myComponent = {
+    oninit: function () {
+      o(attr_initialized).equals(true)('`attr.oninit()` should run before `tag.oninit()`')
+      tag_initialized = true
+    },
+    view: function(){return m('p','p')},
+    onremove: function () {
+      o(attr_removed).equals(true)('`attr.onremove()` should run before `tag.onremove()`')
+      tag_removed = true
+    }
+  }
+  o(render(m(myComponent, {
+    oninit: function(vnode) {
+      o(this).equals(vnode.state)('vnode.state should be the context in `attr.oninit`')
+      attr_initialized = true
+    },
+    onremove: function(vnode) {
+      o(this).equals(vnode.state)('vnode.state should be the context in `attr.onremove`')
+      attr_removed = true
+    }
+  }))).equals('<p>p</p>')
+  o(tag_initialized).equals(true)('tag.oninit should be called')
+  o(tag_removed).equals(true)('tag.onremove should be called')
+})
+
+o('onremove hooks should be called once the whole tree has been inititalized', function(){
+  var initialized = 0
+  var onremove = o.spy()
+  function oninit() {
+    initialized ++
+    o(onremove.callCount).equals(0)
+  }
+  var attrs = {oninit: oninit, onremove: onremove}
+  var myComponent = {
+    oninit: oninit,
+    view: function(){
+      return m('p', attrs, 'p')
+    },
+    onremove: onremove
+  }
+  o(render([m(myComponent, attrs), m(myComponent, attrs)]))
+  o(initialized).equals(6)("oninit should run six times")
+  o(onremove.callCount).equals(6)("onremove should run six times")
+})
+
+o("hooks are called top-down, depth-first on elements", function(){
+  /*
+   Suppose a tree with the following structure: two levels of depth,
+   two components on the first depth level, the first one having a
+   single child on level 2.
+
+   +-- L1_C1
+   | +-- L2_C1
+   |
+   +-- L1_C2
+
+  */
+  var L1_C1_init = false, L1_C2_init = false, L2_C1_init = false
+  var L1_C1_removed = false, L1_C2_removed = false, L2_C1_removed = false
+  o(render([
+    m(
+      'p',
+      {
+        oninit: function(){
+          L1_C1_init = true
+          o(L1_C2_init).equals(false)
+          o(L2_C1_init).equals(false)
+        },
+        onremove: function(){
+          L1_C1_removed = true
+          o(L1_C2_removed).equals(false)
+          o(L2_C1_removed).equals(false)
+        }
+      },
+      m(
+        'a',
+        {
+          oninit: function(){
+            L2_C1_init = true
+            o(L1_C1_init).equals(true)
+            o(L1_C2_init).equals(false)
+          },
+          onremove: function(){
+            L2_C1_removed = true
+            o(L1_C1_removed).equals(true)
+            o(L1_C2_removed).equals(false)
+          }
+        },
+        "q"
+      )
+    ),
+    m(
+      'ul', 
+      {
+        oninit: function(){
+          L1_C2_init = true
+          o(L1_C1_init).equals(true)
+          o(L2_C1_init).equals(true)
+        },
+        onremove: function(){
+          L1_C2_removed = true
+          o(L1_C1_removed).equals(true)
+          o(L2_C1_removed).equals(true)
+        }
+      },
+      "r"
+    )
+  ])).equals("<p><a>q</a></p><ul>r</ul>")
+  o(L1_C1_init && L2_C1_init && L1_C2_init && 
+    L1_C1_removed && L2_C1_removed && L1_C2_removed).equals(true)
+})
+
 o.run()
