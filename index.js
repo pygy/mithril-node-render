@@ -53,6 +53,10 @@ function setHooks (view, hooks) {
   if (typeof view.tag !== 'string' && typeof view.tag.onremove === 'function') hooks.push(view.tag.onremove.bind(view.state, view))
 }
 
+function normalize(views) {
+  return isArray(views) ? views : [views]
+}
+
 function createAttrString (view, escapeAttributeValue) {
   var attrs = view.attrs
 
@@ -98,7 +102,7 @@ function createChildrenContent (view, options, hooks) {
     return ''
   }
 
-  return _render(view.children, options, hooks)
+  return renderNodes(view.children, options, hooks)
 }
 
 function render (view, options) {
@@ -115,37 +119,29 @@ function render (view, options) {
     if (!options.hasOwnProperty(key)) options[key] = defaultOptions[key]
   })
 
-  var result = _render(view, options, hooks)
+  var result = renderNodes(normalize(view), options, hooks)
 
   hooks.forEach(function (hook) { hook() })
 
   return result
 }
 
-function _render (view, options, hooks) {
-  var type = typeof view
-
-  if (type === 'string') {
-    return options.escapeString(view)
+function renderNodes(views, options, hooks) {
+  if (isArray(views)) {
+    return views.map(function (view) { return renderNode(view, options, hooks) }).join('')
   }
+}
 
-  if (type === 'number' || type === 'boolean') {
-    return view
-  }
-
-  if (!view) {
+function renderNode (view, options, hooks) {
+  if (view == null) { // TODO add booleans back when they land
     return ''
-  }
-
-  if (isArray(view)) {
-    return view.map(function (view) { return _render(view, options, hooks) }).join('')
   }
 
   // component
   if (typeof view.tag === 'object' && view.tag.view) {
     view.state = copy(view.tag)
     setHooks(view, hooks)
-    return _render(view.tag.view.call(view.state, view), options, hooks)
+    return renderNodes(normalize(view.tag.view.call(view.state, view)), options, hooks)
   }
 
   setHooks(view, hooks)
@@ -153,10 +149,10 @@ function _render (view, options, hooks) {
   if (view.tag === '<') {
     return '' + view.children
   }
-  var children = createChildrenContent(view, options, hooks)
   if (view.tag === '#') {
-    return options.escapeString(children)
+    return options.escapeString(view.children)
   }
+  var children = createChildrenContent(view, options, hooks)
   if (view.tag === '[') {
     return '' + children
   }
