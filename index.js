@@ -47,18 +47,18 @@ function escapeHtml (s, replaceDoubleQuote) {
   return s
 }
 
-function oninit(view) {
-  if (view.attrs && typeof view.attrs.oninit === "function") view.attrs.oninit.call(view.state, view)
-  if (typeof view.tag !== "string" && typeof view.tag.oninit === "function") view.tag.oninit.call(view.state, view)
+function oninit(vnode) {
+  if (vnode.attrs && typeof vnode.attrs.oninit === "function") vnode.attrs.oninit.call(vnode.state, vnode)
+  if (typeof vnode.tag !== "string" && typeof vnode.tag.oninit === "function") vnode.tag.oninit.call(vnode.state, vnode)
 }
 
-function onremove(view, hooks) {
-  if (view.attrs && typeof view.attrs.onremove === "function") hooks.push(view.attrs.onremove.bind(view.state, view))
-  if (typeof view.tag !== "string" && typeof view.tag.onremove === "function") hooks.push(view.tag.onremove.bind(view.state, view))
+function onremove(vnode, hooks) {
+  if (vnode.attrs && typeof vnode.attrs.onremove === "function") hooks.push(vnode.attrs.onremove.bind(vnode.state, vnode))
+  if (typeof vnode.tag !== "string" && typeof vnode.tag.onremove === "function") hooks.push(vnode.tag.onremove.bind(vnode.state, vnode))
 }
 
-function createAttrString (view, escapeAttributeValue) {
-  var attrs = view.attrs
+function createAttrString (vnode, escapeAttributeValue) {
+  var attrs = vnode.attrs
 
   if (!attrs || !Object.keys(attrs).length) {
     return ''
@@ -86,7 +86,7 @@ function createAttrString (view, escapeAttributeValue) {
     }
 
     // Handle SVG <use> tags specially
-    if (name === 'href' && view.tag === 'use') {
+    if (name === 'href' && vnode.tag === 'use') {
       return ' xlink:href="' + escapeAttributeValue(value, true) + '"'
     }
 
@@ -94,18 +94,18 @@ function createAttrString (view, escapeAttributeValue) {
   }).join('')
 }
 
-function createChildrenContent (view, options, hooks) {
-  if (view.text != null) {
-    return options.escapeString(view.text)
+function createChildrenContent (vnode, options, hooks) {
+  if (vnode.text != null) {
+    return options.escapeString(vnode.text)
   }
-  if (isArray(view.children) && !view.children.length) {
+  if (isArray(vnode.children) && !vnode.children.length) {
     return ''
   }
 
-  return _render(view.children, options, hooks)
+  return _render(vnode.children, options, hooks)
 }
 
-function render (view, options) {
+function render (vnode, options) {
   options = options || {}
   var hooks = []
 
@@ -119,62 +119,62 @@ function render (view, options) {
     if (!options.hasOwnProperty(key)) options[key] = defaultOptions[key]
   })
 
-  var result = _render(view, options, hooks)
+  var result = _render(vnode, options, hooks)
 
   hooks.forEach(function(hook){hook()})
 
   return result
 }
 
-function _render (view, options, hooks) {
-  var type = typeof view
+function _render (vnode, options, hooks) {
+  var type = typeof vnode
 
   if (type === 'string') {
-    return options.escapeString(view)
+    return options.escapeString(vnode)
   }
 
   if (type === 'number' || type === 'boolean') {
-    return view
+    return vnode
   }
 
-  if (!view) {
+  if (!vnode) {
     return ''
   }
 
-  if (isArray(view)) {
-    return view.map(function (view) { return _render(view, options, hooks) }).join('')
+  if (isArray(vnode)) {
+    return vnode.map(function (vnode) { return _render(vnode, options, hooks) }).join('')
   }
 
 
   // component
-  if (typeof view.tag === 'object' && view.tag.view) {
-    view.state = copy(view.tag)
-    oninit(view)
-    onremove(view, hooks)
-    return _render(view.tag.view.call(view.state, view), options, hooks)
+  if (typeof vnode.tag === 'object' && vnode.tag.view) {
+    vnode.state = copy(vnode.tag)
+    oninit(vnode)
+    onremove(vnode, hooks)
+    return _render(vnode.tag.view.call(vnode.state, vnode), options, hooks)
   }
 
-  oninit(view)
-  onremove(view, hooks)
+  oninit(vnode)
+  onremove(vnode, hooks)
 
 
-  if (view.tag === '<') {
-    return '' + view.children
+  if (vnode.tag === '<') {
+    return '' + vnode.children
   }
-  var children = createChildrenContent(view, options, hooks)
-  if (view.tag === '#') {
+  var children = createChildrenContent(vnode, options, hooks)
+  if (vnode.tag === '#') {
     return options.escapeString(children)
   }
-  if (view.tag === '[') {
+  if (vnode.tag === '[') {
     return '' + children
   }
-  if (!children && (options.strict || VOID_TAGS.indexOf(view.tag.toLowerCase()) >= 0)) {
-    return '<' + view.tag + createAttrString(view, options.escapeAttributeValue) + (options.strict ? '/' : '') + '>'
+  if (!children && (options.strict || VOID_TAGS.indexOf(vnode.tag.toLowerCase()) >= 0)) {
+    return '<' + vnode.tag + createAttrString(vnode, options.escapeAttributeValue) + (options.strict ? '/' : '') + '>'
   }
   return [
-    '<', view.tag, createAttrString(view, options.escapeAttributeValue), '>',
+    '<', vnode.tag, createAttrString(vnode, options.escapeAttributeValue), '>',
     children,
-    '</', view.tag, '>'
+    '</', vnode.tag, '>'
   ].join('')
 }
 
